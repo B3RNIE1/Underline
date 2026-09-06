@@ -31,61 +31,65 @@
         header {
             border-bottom: 1px solid var(--tile-border);
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
 
         h1 {
             margin: 10px 0;
-            letter-spacing: 2px;
-            font-size: 2rem;
+            letter-spacing: 3px;
+            font-size: 2.2rem;
         }
 
         .container {
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 25px;
         }
 
-        /* Target Word Styling */
+        /* Upgraded Target Word Layout (Wordle-style Blank Blocks) */
         #targetDisplay {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
             margin-bottom: 10px;
+            width: 100%;
         }
 
         .target-letter {
-            width: 35px;
-            height: 45px;
-            border-bottom: 4px solid #818384;
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--tile-border);
+            background-color: var(--tile-bg);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: bold;
             text-transform: uppercase;
+            box-sizing: border-box;
             transition: all 0.3s ease;
         }
 
         .target-letter.revealed {
-            border-bottom: 4px solid var(--correct-bg);
-            color: var(--correct-bg);
-            animation: pop 0.3s ease;
+            background-color: var(--correct-bg);
+            border-color: var(--correct-bg);
+            color: white;
+            animation: flipIn 0.5s ease forwards;
         }
 
-        /* Guess Board Grid */
+        /* Player 5-Letter Guess Board Grid */
         #board {
             display: grid;
             grid-template-rows: repeat(5, 1fr);
             gap: 5px;
             width: 100%;
-            max-width: 300px;
+            max-width: 250px;
         }
 
         .row {
@@ -101,7 +105,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -120,12 +124,12 @@
             border-color: var(--absent-bg);
         }
 
-        /* Controls */
+        /* Interactive UI controls */
         .controls {
             display: flex;
             flex-direction: column;
             width: 100%;
-            max-width: 300px;
+            max-width: 250px;
             gap: 10px;
         }
 
@@ -175,12 +179,12 @@
             font-weight: bold;
             text-align: center;
             min-height: 24px;
+            color: #ff5555;
         }
 
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-            100% { transform: scale(1); }
+        @keyframes flipIn {
+            0% { transform: rotateX(90deg); opacity: 0; }
+            100% { transform: rotateX(0deg); opacity: 1; }
         }
     </style>
 </head>
@@ -191,10 +195,10 @@
     </header>
 
     <div class="container">
-        <!-- The big word to reveal -->
+        <!-- Hidden 10-12 Letter Secret Word Matrix -->
         <div id="targetDisplay"></div>
 
-        <!-- The 5x5 guess grid -->
+        <!-- 5x5 Player Guess Matrix -->
         <div id="board"></div>
 
         <div class="controls">
@@ -207,15 +211,15 @@
     </div>
 
     <script>
-        // Game Configuration
-        const targetWord = "KALEIDOSCOPE"; // 12-letter secret word
+        // Set up the Secret Word (12 Letters long)
+        const targetWord = "KALEIDOSCOPE"; 
         const maxTries = 5;
         let currentTry = 0;
         let gameOver = false;
         let historyGrids = [];
         let revealedLetters = new Set();
 
-        // Elements
+        // Target UI Blocks
         const targetDisplay = document.getElementById('targetDisplay');
         const board = document.getElementById('board');
         const guessInput = document.getElementById('guessInput');
@@ -223,18 +227,21 @@
         const shareBtn = document.getElementById('shareBtn');
         const messageDisplay = document.getElementById('message');
 
-        // Initialize Game
-        function initGame() {
-            // Build MegaWord blanks
+        // Function that builds the clean UI layouts safely
+        function startUpGame() {
+            targetDisplay.innerHTML = "";
+            board.innerHTML = "";
+
+            // 1. Build Wordle-style blocks for the big hidden word
             for (let i = 0; i < targetWord.length; i++) {
-                const span = document.createElement('span');
-                span.classList.add('target-letter');
-                span.setAttribute('id', `target-${i}`);
-                span.innerText = "_";
-                targetDisplay.appendChild(span);
+                const box = document.createElement('div');
+                box.classList.add('target-letter');
+                box.setAttribute('id', `target-${i}`);
+                box.innerText = ""; // Starts empty just like Wordle
+                targetDisplay.appendChild(box);
             }
 
-            // Build 5x5 Grid Board
+            // 2. Build the standard 5x5 Grid Board below it
             for (let r = 0; r < maxTries; r++) {
                 const row = document.createElement('div');
                 row.classList.add('row');
@@ -249,37 +256,39 @@
             guessInput.focus();
         }
 
-        // Live grid rendering as the user types
+        // Mirrors user typing directly into the rows
         guessInput.addEventListener('input', (e) => {
             if (gameOver) return;
             const val = e.target.value.toUpperCase();
             for (let c = 0; c < 5; c++) {
                 const cell = document.getElementById(`cell-${currentTry}-${c}`);
-                if (val[c]) {
-                    cell.innerText = val[c];
-                    cell.classList.add('active');
-                } else {
-                    cell.innerText = "";
-                    cell.classList.remove('active');
+                if (cell) {
+                    if (val[c]) {
+                        cell.innerText = val[c];
+                        cell.classList.add('active');
+                    } else {
+                        cell.innerText = "";
+                        cell.classList.remove('active');
+                    }
                 }
             }
         });
 
-        // Submit Logic
-        function submitGuess() {
+        // Submit guess evaluation calculations
+        function processGuess() {
             if (gameOver) return;
 
             const guess = guessInput.value.toUpperCase();
 
             if (guess.length !== 5) {
-                showMessage("Guess must be exactly 5 letters!");
+                printMessage("Guess must be exactly 5 letters!");
                 return;
             }
 
-            showMessage(""); // Clear errors
+            printMessage(""); // Flush errors
             let rowEmojiPattern = "";
 
-            // Evaluate the 5-letter guess against the large target word
+            // Grade the current row matching letters
             for (let c = 0; c < 5; c++) {
                 const letter = guess[c];
                 const cell = document.getElementById(`cell-${currentTry}-${c}`);
@@ -296,46 +305,26 @@
 
             historyGrids.push(rowEmojiPattern);
 
-            // Update the Top Target MegaWord Blocks
-            let completelyUnmasked = true;
+            // Re-render and unmask correct letter tiles at the top
+            let wonGame = true;
             for (let i = 0; i < targetWord.length; i++) {
-                const letter = targetWord[i];
-                const span = document.getElementById(`target-${i}`);
-                if (revealedLetters.has(letter)) {
-                    span.innerText = letter;
-                    span.classList.add('revealed');
+                const currentLetter = targetWord[i];
+                const box = document.getElementById(`target-${i}`);
+                if (revealedLetters.has(currentLetter)) {
+                    box.innerText = currentLetter;
+                    box.classList.add('revealed');
                 } else {
-                    completelyUnmasked = false;
+                    wonGame = false;
                 }
             }
 
-            // Move to next line
             currentTry++;
             guessInput.value = "";
 
-            // Check Win / Loss Conditions
-            if (completelyUnmasked) {
-                showMessage("🎉 Spectacular! You completely unmasked the word!");
-                endGame();
+            // Check End Conditions
+            if (wonGame) {
+                printMessage("🎉 You Unmasked the word completely!");
+                finishGame();
             } else if (currentTry >= maxTries) {
-                showMessage(`Game Over! The word was ${targetWord}`);
-                endGame();
-            }
-        }
-
-        function showMessage(msg) {
-            messageDisplay.innerText = msg;
-        }
-
-        function endGame() {
-            gameOver = true;
-            guessInput.disabled = true;
-            submitBtn.style.display = "none";
-            shareBtn.style.display = "block";
-        }
-
-        // Action Listeners
-        submitBtn.addEventListener('click', submitGuess);
-        guessInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') submitGuess();
-        });
+                printMessage(`Game Over! The mystery word was ${targetWord}`);
+                finishGame();
