@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNMASK - Daily Word Game</title>
+    <style>
+        :root {
+            --bg-color: #121213;
+            --card-bg: #1a1a1c;
+            --text-color: #ffffff;
+            --accent-color: #538d4e;
+            --hidden-color: #3a3a3c;
+            --revealed-color: #b59f3b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            max-width: 500px;
+            border-bottom: 1px solid var(--hidden-color);
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            letter-spacing: 2px;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .target-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .target-letter {
+            width: 35px;
+            height: 45px;
+            border: 2px solid var(--hidden-color);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            background-color: var(--card-bg);
+            transition: all 0.5s ease;
+        }
+
+        .target-letter.revealed {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            transform: rotateX(360deg);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-rows: repeat(5, 1fr);
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 2px solid var(--hidden-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .cell.filled {
+            border-color: #565758;
+        }
+
+        .cell.checked {
+            background-color: var(--revealed-color);
+            border-color: var(--revealed-color);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            font-size: 1.1rem;
+            border: 2px solid var(--hidden-color);
+            border-radius: 4px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #565758;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--card-bg);
+            border: 1px solid var(--hidden-color);
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 23px rgba(0,0,0,0.5);
+            z-index: 10;
+            width: 80%;
+            max-width: 400px;
+        }
+
+        .share-btn {
+            background-color: #007bc2;
+            margin-top: 15px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>UNMASK</h1>
+    </header>
+
+    <main>
+        <!-- The big word to guess -->
+        <div class="target-container" id="targetWordContainer"></div>
+
+        <!-- 5 tries grid -->
+        <div class="grid" id="guessGrid"></div>
+
+        <!-- Input control -->
+        <div class="input-area">
+            <input type="text" id="guessInput" maxlength="5" placeholder="TYPE 5 LETTERS" autofocus>
+            <button id="submitBtn">Guess</button>
+        </div>
+    </main>
+
+    <!-- Game Over Notification -->
+    <div class="modal" id="gameOverModal">
+        <h2 id="modalTitle">Game Over</h2>
+        <p id="modalMessage"></p>
+        <button class="share-btn" id="shareBtn">Share Results 🟩</button>
+    </div>
+
+    <script>
+        // Game setup config
+        const TARGET_WORDS = ["KALEIDOSCOPE", "JOURNEYMAN", "THUNDERSTORM", "BLOCKCHAIN", "METAVERSE", "SUBSTANCES"];
+        // Pick a static word for the day (or random for this prototype)
+        const targetWord = TARGET_WORDS[Math.floor(Math.random() * TARGET_WORDS.length)];
+        const maxTries = 5;
+        let currentTry = 0;
+        let revealedLetters = new Set();
+        let historyGrids = []; // For social sharing layout
+
+        const targetContainer = document.getElementById('targetWordContainer');
+        const guessGrid = document.getElementById('guessGrid');
+        const guessInput = document.getElementById('guessInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const modal = document.getElementById('gameOverModal');
+
+        // 1. Build hidden large target word placeholders
+        function initTargetWord() {
+            targetContainer.innerHTML = '';
+            for (let i = 0; i < targetWord.length; i++) {
+                const letterBox = document.createElement('div');
+                letterBox.classList.add('target-letter');
+                letterBox.setAttribute('id', `target-${i}`);
+                letterBox.textContent = '?';
+                targetContainer.appendChild(letterBox);
+            }
+        }
+
+        // 2. Build the 5x5 layout grids
+        function initGrid() {
+            guessGrid.innerHTML = '';
+            for (let r = 0; r < maxTries; r++) {
+                const row = document.createElement('div');
+                row.classList.add('row');
+                for (let c = 0; c < 5; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.setAttribute('id', `cell-${r}-${c}`);
+                    row.appendChild(cell);
+                }
+                guessGrid.appendChild(row);
+            }
+        }
+
+        // 3. Process the player's 5-letter guess
+        function submitGuess() {
+            const guess = guessInput.value.toUpperCase();
+            if (guess.length !== 5) {
+                alert("Guess must be exactly 5 letters!");
+                return;
+            }
+
+            let shareRowPattern = "";
+
+            // Populate guess row
+            for (let i = 0; i < 5; i++) {
+                const cell = document.getElementById(`cell-${currentTry}-${i}`);
+                const letter = guess[i];
+                cell.textContent = letter;
+                cell.classList.add('checked');
+
+                // Check if letter matches any element inside the target secret word
+                if (targetWord.includes(letter)) {
+                    revealedLetters.add(letter);
+                    shareRowPattern += "🟩"; // Letter unmasked tracking
+                } else {
+                    shareRowPattern += "⬛";
+                }
+            }
+
+            historyGrids.push(shareRowPattern);
+
+            // Update the display architecture of the main puzzle string
+            let totalUnmasked = 0;
+            for (let i = 0; i < targetWord.length; i++) {
+                const char = targetWord[i];
+                if (revealedLetters.has(char)) {
+                    const targetBox = document.getElementById(`target-${i}`);
+                    targetBox.textContent = char;
+                    targetBox.classList.add('revealed');
+                    totalUnmasked++;
+                }
+            }
+
+            currentTry++;
+            guessInput.value = '';
+
+            // Win condition checks
+            if (totalUnmasked === targetWord.length) {
+                endGame(true);
+                return;
+            }
+
+            // Lose condition checks
+            if (currentTry >= maxTries) {
+                endGame(false);
+            }
+        }
+
+        function endGame(isWin) {
+            guessInput.disabled = true;
+            submitBtn.disabled = true;
+            modal.style.display = 'block';
+            
+            document.getElementById('modalTitle').textContent = isWin ? "Victory!" : "Game Over";
+            document.getElementById('modalMessage').textContent = isWin 
+                ? `You fully unmasked the word in ${currentTry} tries!` 
+                : `So close! The secret word was: ${targetWord}`;
+        }
+
+        // 4. Clipboard Generation for Social Copying loop
+        document.getElementById('shareBtn').addEventListener('click', () => {
